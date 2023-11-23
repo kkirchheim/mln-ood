@@ -1,0 +1,126 @@
+defaults:
+  - override hydra/job_logging: colorlog
+  - override hydra/hydra_logging: colorlog
+
+hydra:
+  job_logging:
+    handlers:
+      file:
+        filename: ${hydra.runtime.output_dir}/${hydra.job.name}.log
+
+n_seeds: 10
+device: "cuda"
+
+backbone: "wrn40"
+
+datasets:
+  - "LSUNCrop"
+  - "LSUNResize"
+  # - "Textures"
+  - "TinyImageNetCrop"
+  - "TinyImageNetResize"
+  - "Places365"
+  - "iNaturalist"
+  - "GaussianNoise"
+  - "UniformNoise"
+
+paths:
+  root: "../data/"
+  output: "/run/media/ki/data/mln-ood/"
+  models: "${paths.output}/gtsrb/models/${backbone}"
+  predictions:  "${paths.output}/gtsrb/predictions/${backbone}"
+
+use_oe: True
+use_llm: True
+is_shared: False
+
+llm_results_files:
+  llama3_8b_kb: llm/llama3-8b-kb.csv
+  llama3_8b: llm/llama3-8b.csv
+  llama3_70b_kb: llm/llama3-70b-kb.csv
+  llama3_70b: llm/llama3-70b.csv
+  mistral_7b_kb: llm/mistral-7b-kb.csv
+  mistral_7b: llm/mistral-7b.csv
+  mistral_8x7b_kb: llm/mistral-8x7b-kb.csv
+  mistral_8x7b: llm/mistral-8x7b.csv
+
+fit_score_dist_on: "val"
+fit_score_dist: "genextreme"
+
+
+mln:
+  train_on: "val"
+  epochs: 10
+  batch_size: 4000000
+  lr: 0.01
+  loss: "likelihood"
+  init: -1
+  progress: False
+
+
+constraints:
+- "class=speed_limit_30 -> (color=red and shape=circle)"
+- "class=speed_limit_50 -> (color=red and shape=circle)"
+- "class=speed_limit_60 -> (color=red and shape=circle)"
+- "class=speed_limit_70 -> (color=red and shape=circle)"
+- "class=speed_limit_80 -> (color=red and shape=circle)"
+- "class=restriction_ends_80 -> (color=white and shape=circle)"
+- "class=speed_limit_100 -> (color=red and shape=circle)"
+- "class=speed_limit_120 -> (color=red and shape=circle)"
+- "class=no_overtaking -> (color=red and shape=circle)"
+- "class=no_overtaking_trucks -> (color=red and shape=circle)"
+- "class=priority_at_next_intersection -> (color=red and shape=triangle)"
+- "class=priority_road -> (color=yellow and shape=square)"
+- "class=give_way -> (color=red and shape=inverse_triangle)"
+- "class=stop -> (color=red and shape=octagon)"
+- "class=no_traffic_both_ways -> (color=red and shape=circle)"
+- "class=no_trucks -> (color=red and shape=circle)"
+- "class=no_entry -> (color=red and shape=circle)"
+- "class=danger -> (color=red and shape=triangle)"
+- "class=bend_left -> (color=red and shape=triangle)"
+- "class=bend_right -> (color=red and shape=triangle)"
+- "class=bend -> (color=red and shape=triangle)"
+- "class=uneven_road -> (color=red and shape=triangle)"
+- "class=slippery_road -> (color=red and shape=triangle)"
+- "class=road_narrows -> (color=red and shape=triangle)"
+- "class=construction -> (color=red and shape=triangle)"
+- "class=traffic_signal -> (color=red and shape=triangle)"
+- "class=pedestrian_crossing -> (color=red and shape=triangle)"
+- "class=school_crossing -> (color=red and shape=triangle)"
+- "class=cycles_crossing -> (color=red and shape=triangle)"
+- "class=snow -> (color=red and shape=triangle)"
+- "class=animals -> (color=red and shape=triangle)"
+- "class=restriction_ends -> (color=white and shape=circle)"
+- "class=go_right -> (color=blue and shape=circle)"
+- "class=go_left -> (color=blue and shape=circle)"
+- "class=go_straight -> (color=blue and shape=circle)"
+- "class=go_right_or_straight -> (color=blue and shape=circle)"
+- "class=go_left_or_straight -> (color=blue and shape=circle)"
+- "class=keep_right -> (color=blue and shape=circle)"
+- "class=keep_left -> (color=blue and shape=circle)"
+- "class=roundabout -> (color=blue and shape=circle)"
+- "class=restriction_ends_overtaking -> (color=white and shape=circle)"
+- "class=restriction_ends_overtaking_trucks -> (color=white and shape=circle)"
+- "class=speed_limit_20 -> (color=red and shape=circle)"
+
+
+
+# rules obtained by probabilistic constraint mining
+#- ((class=speed_limit_120 -> color=yellow) or shape=triangle)
+#- (color=red and shape=triangle)
+#- (shape=inverse_triangle xor class=give_way)
+#- (shape=octagon xor class=stop)
+#- class=danger
+#- class=priority_at_next_intersection
+#- class=speed_limit_100
+#- class=speed_limit_30
+#- shape=triangle
+
+
+# rules obtained by logical constraint mining, 05.03.2025
+#- (color=blue or not class=roundabout)
+#- (color=white -> shape=circle)
+#- (class=give_way or not shape=inverse_triangle)
+#- (class=priority_road -> color=yellow)
+#- (class=stop -> shape=octagon)
+

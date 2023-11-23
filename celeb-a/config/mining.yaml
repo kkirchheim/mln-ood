@@ -1,0 +1,77 @@
+defaults:
+  - override hydra/job_logging: colorlog
+  - override hydra/hydra_logging: colorlog
+
+hydra:
+  job_logging:
+    handlers:
+      file:
+        filename: ${hydra.runtime.output_dir}/${hydra.job.name}.log
+
+device: "cuda"
+backbone: "resnet18"
+
+n_seeds: 5
+
+paths:
+  root: "/run/media/ki/data/datasets/"
+  models: "/run/media/ki/data/mln-ood/celeba/models/${backbone}/"
+  predictions: "/run/media/ki/data/mln-ood/celeba/predictions/${backbone}/"
+
+dataset: "Textures"
+validate_on: "val"
+
+min_delta: 0.01
+
+attributes:
+- 'blond_hair'
+- 'gray_hair'
+# - 'arched_eyebrows'
+# - 'chubby'
+#  - 'big_nose'
+- 'receding_hairline'
+- 'heavy_makeup'
+- 'brown_hair'
+  # - 'big_lips'
+# - 'wavy_hair'
+# - 'black_hair'
+# - 'bushy_eyebrows'
+# - 'pale_skin'
+- 'young'
+# - 'eyeglasses'
+- 'wearing_lipstick'
+# - 'narrow_eyes'
+# - 'wearing_earrings'
+# - 'oe'
+# - 'high_cheekbones'
+# - 'double_chin'
+# - '5_o_clock_shadow'
+# - 'blurry'
+# - 'rosy_cheeks'
+# - 'bangs'
+- 'mustache'
+  # - 'wearing_necklace'
+- 'male'
+- 'goatee'
+  # - 'wearing_necktie'
+# - 'oval_face'
+- 'attractive'
+# - 'sideburns'
+# - 'smiling'
+  # - 'bags_under_eyes'
+# - 'mouth_slightly_open'
+# - 'straight_hair'
+- 'bald'
+- 'no_beard'
+# - 'wearing_hat'
+# - 'pointy_nose'
+
+
+mln:
+  train_on: "val"
+  epochs: 10
+  batch_size: 40000
+  lr: 0.01
+#  weight_decay: 0.0
+#  momentum: 0.0
+#  nesterov: False

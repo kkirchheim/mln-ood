@@ -1,0 +1,11 @@
+torch
+pytorch-ood
+hydra-core
+hydra-colorlog
+pandas
+numpy==1.24.4
+tensorboardX
+scipy
+torchvision # ==0.20.1
+packaging==24.2
+scikit-learn

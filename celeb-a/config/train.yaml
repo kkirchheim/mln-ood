@@ -1,0 +1,55 @@
+n_seeds: 10
+epochs: 10
+device: "cuda"
+
+backbone: "resnet18"
+
+paths:
+  root: "/run/media/ki/data/datasets/"
+  models: "/run/media/ki/data/mln-ood/celeba/models/${backbone}/"
+  predictions: "/run/media/ki/data/mln-ood/celeba/predictions/${backbone}/"
+
+attributes:
+- 'Blond_Hair'
+- 'Gray_Hair'
+# - 'arched_eyebrows'
+- 'Chubby'
+- 'Big_Nose'
+- 'Receding_Hairline'
+- 'Heavy_Makeup'
+- 'Brown_Hair'
+- 'Big_Lips'
+# - 'wavy_hair'
+# - 'black_hair'
+# - 'bushy_eyebrows'
+- 'Pale_Skin'
+- 'Young'
+# - 'eyeglasses'
+- 'Wearing_Lipstick'
+# - 'narrow_eyes'
+- 'Wearing_Earrings'
+# - 'oe'
+- 'High_Cheekbones'
+# - 'double_chin'
+# - '5_o_clock_shadow'
+# - 'blurry'
+- 'Rosy_Cheeks'
+# - 'bangs'
+- 'Mustache'
+- 'Wearing_Necklace'
+- 'Male'
+- 'Goatee'
+- 'Wearing_Necktie'
+# - 'oval_face'
+- 'Attractive'
+# - 'sideburns'
+- 'Smiling'
+- 'Bags_Under_Eyes'
+# - 'mouth_slightly_open'
+# - 'straight_hair'
+- 'Bald'
+- 'No_Beard'
+# - 'wearing_hat'
+# - 'pointy_nose'
+inference:
+  batch_size: 8

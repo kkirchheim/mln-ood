@@ -1,0 +1,99 @@
+
+defaults:
+  - override hydra/job_logging: colorlog
+  - override hydra/hydra_logging: colorlog
+
+note_minded_dataset: iNaturalist
+n_seeds: 10
+device: "cuda"
+
+backbone: "resnet18"
+
+use_oe: False
+
+
+fit_score_dist_on: "val"
+fit_score_dist: "genextreme"
+
+paths:
+  root: "/run/media/ki/data/datasets/"
+  models: "/run/media/ki/data/mln-ood/celeba/models/resnet18/"
+  predictions: "/run/media/ki/data/mln-ood/celeba/predictions/resnet18/"
+
+constraints:
+- gray_hair
+- young
+- attractive
+- no_beard
+- gray_hair -> young
+- wearing_lipstick -> receding_hairline
+- male -> no_beard
+
+
+
+datasets:
+- LSUNCrop
+- LSUNResize
+- Textures
+- TinyImageNetCrop
+- TinyImageNetResize
+- Places365
+- GaussianNoise
+- UniformNoise
+
+
+
+attributes:
+- 'blond_hair'
+- 'gray_hair'
+# - 'arched_eyebrows'
+# - 'chubby'
+#  - 'big_nose'
+- 'receding_hairline'
+- 'heavy_makeup'
+- 'brown_hair'
+  # - 'big_lips'
+# - 'wavy_hair'
+# - 'black_hair'
+# - 'bushy_eyebrows'
+# - 'pale_skin'
+- 'young'
+# - 'eyeglasses'
+- 'wearing_lipstick'
+# - 'narrow_eyes'
+# - 'wearing_earrings'
+# - 'oe'
+# - 'high_cheekbones'
+# - 'double_chin'
+# - '5_o_clock_shadow'
+# - 'blurry'
+# - 'rosy_cheeks'
+# - 'bangs'
+- 'mustache'
+  # - 'wearing_necklace'
+- 'male'
+- 'goatee'
+  # - 'wearing_necktie'
+# - 'oval_face'
+- 'attractive'
+# - 'sideburns'
+- 'smiling'
+  # - 'bags_under_eyes'
+# - 'mouth_slightly_open'
+# - 'straight_hair'
+- 'bald'
+- 'no_beard'
+# - 'wearing_hat'
+# - 'pointy_nose'
+- "oe"
+
+target_att: "brown_hair"
+
+mln:
+  train_on: "val"
+  epochs: 10
+  loss: "likelihood"
+  batch_size: 40000
+  lr: 0.01
+
+    

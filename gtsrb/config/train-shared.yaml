@@ -1,0 +1,15 @@
+n_seeds: 10
+epochs: 10
+device: "cuda"
+
+backbone: "wrn40"
+
+paths:
+  root: "../data/"
+  models: "/run/media/ki/data/mln-ood/gtsrb/models/shared-${backbone}"
+  predictions:  "/run/media/ki/data/mln-ood/gtsrb/predictions/shared-${backbone}"
+
+image_size:
+  - 32
+  - 32
+

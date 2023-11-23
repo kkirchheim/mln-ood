@@ -1,0 +1,33 @@
+n_seeds: 10
+device: "cuda"
+
+backbone: "wrn40"
+
+paths:
+  root: "../data/"
+  models: "/run/media/ki/data/mln-ood/gtsrb/models/${backbone}-shared"
+  predictions:  "/run/media/ki/data/mln-ood/gtsrb/predictions/${backbone}-shared"
+
+use_oe: False
+use_llm: False
+
+is_shared: True
+
+llm_results_files:
+  llama3_8b_kb: llm/llama3-8b-kb.csv
+  llama3_8b: llm/llama3-8b.csv
+  llama3_70b_kb: llm/llama3-70b-kb.csv
+  llama3_70b: llm/llama3-70b.csv
+  mistral_7b_kb: llm/mistral-7b-kb.csv
+  mistral_7b: llm/mistral-7b.csv
+  mistral_8x7b_kb: llm/mistral-8x7b-kb.csv
+  mistral_8x7b: llm/mistral-8x7b.csv
+
+mln:
+  train_on: "train"
+  epochs: 100
+  batch_size: 128
+  lr: 0.01
+  weight_decay: 0.1
+  momentum: 0.0
+  nesterov: False

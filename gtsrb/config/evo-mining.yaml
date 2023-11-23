@@ -1,0 +1,65 @@
+defaults:
+  - selector: pareto
+  - override hydra/job_logging: colorlog
+  - override hydra/hydra_logging: colorlog
+  - _self_
+
+
+hydra:
+  job_logging:
+    handlers:
+      file:
+        filename: ${hydra.runtime.output_dir}/${hydra.job.name}.log
+  job:
+    chdir: False
+  run:
+    dir: ./outputs/${oc.env:SLURM_JOB_ID}/
+
+device: "cpu"
+backbone: "wrn40"
+
+max_depth: 2
+init_num_constraints: 10
+n_generations: 100
+population_size: 10000
+
+# mutation
+mutation_rate: 0.5
+
+# selection
+survival_rate: 0.1
+
+objective:
+  _target_: evo.FitnessAUROC
+  alpha: 0.00001
+  compiler: None
+  domain: None
+  cfg: None
+
+operators:
+  - "and"
+  - "implies"
+  - "or"
+  - "xor"
+
+n_seeds: 5
+
+log_every: 10
+
+paths:
+  predictions: "gtsrb/predictions/${backbone}/"
+
+dataset: "Textures"
+validate_on: "val"
+
+attributes:
+# do not change the ordering
+  - label
+  - color
+  - shape
+
+mln:
+  train_on: "train"
+  epochs: 10
+  batch_size: 40000
+  lr: 0.01

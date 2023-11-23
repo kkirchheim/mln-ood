@@ -1,0 +1,35 @@
+n_seeds: 1
+epochs: 2
+device: "cuda"
+
+backbone: "resnet18"
+
+paths:
+  root: "/run/media/ki/data/datasets/"
+  models: "/run/media/ki/data/mln-ood/rival10/models/${backbone}/"
+  predictions: "/run/media/ki/data/mln-ood/rival10/predictions/${backbone}/"
+
+attributes:
+ - 'long_snout'
+ - 'wings'
+ - 'wheels'
+ - 'text'
+ - 'horns'
+ - 'floppy_ears'
+ - 'ears'
+ - 'colored_eyes'
+ - 'tail'
+ - 'mane'
+ - 'beak'
+ - 'hairy'
+ - 'metallic'
+ - 'rectangular'
+ - 'wet'
+ - 'long'
+ - 'tall'
+ - 'patterned'
+ - 'label'
+
+
+inference:
+  batch_size: 8

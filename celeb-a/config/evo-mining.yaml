@@ -1,0 +1,109 @@
+defaults:
+  - selector: pareto
+  - override hydra/job_logging: colorlog
+  - override hydra/hydra_logging: colorlog
+  - _self_
+
+
+hydra:
+  job_logging:
+    handlers:
+      file:
+        filename: ${hydra.runtime.output_dir}/${hydra.job.name}.log
+  job:
+    chdir: False
+  run:
+    dir: ./outputs/${oc.env:SLURM_JOB_ID}/
+
+
+seed: 1234
+device: "cpu"
+backbone: "resnet18"
+
+max_depth: 2
+init_num_constraints: 5
+n_generations: 100
+population_size: 1000
+
+# mutation
+mutation_rate: 0.5
+
+# selection
+survival_rate: 0.1
+
+objective:
+  _target_: evo.FitnessAUROC
+  alpha: 0.00001
+  compiler: None
+  domain: None
+  cfg: None
+
+operators:
+  - "and"
+  - "implies"
+  - "or"
+  - "xor"
+
+n_seeds: 5
+
+log_every: 10
+
+paths:
+  predictions: "celeba/predictions/${backbone}/"
+
+dataset: "Textures"
+validate_on: "val"
+
+
+
+attributes:
+- 'blond_hair'
+- 'gray_hair'
+- 'arched_eyebrows' #
+- 'chubby' #
+- 'big_nose'#
+- 'receding_hairline'
+- 'heavy_makeup'
+- 'brown_hair'
+- 'big_lips'#
+- 'wavy_hair'#
+- 'black_hair'#
+- 'bushy_eyebrows'#
+- 'pale_skin'#
+- 'young'
+- 'eyeglasses'#
+- 'wearing_lipstick'
+- 'narrow_eyes'#
+- 'wearing_earrings'#
+- 'high_cheekbones'#
+- 'double_chin'#
+# - '5_o_clock_shadow'#
+- 'blurry'#
+- 'rosy_cheeks'#
+- 'bangs'#
+- 'mustache'
+- 'wearing_necklace'#
+- 'male'
+- 'goatee'
+- 'wearing_necktie'#
+- 'oval_face'#
+- 'attractive'
+- 'sideburns'#
+- 'smiling'#
+- 'bags_under_eyes'#
+- 'mouth_slightly_open'#
+- 'straight_hair'#
+- 'bald'
+- 'no_beard'
+- 'wearing_hat'#
+- 'pointy_nose'#
+
+# - 'oe'#
+
+
+mln:
+  train_on: "train"
+  epochs: 10
+  batch_size: 400000
+  lr: 0.01
+  progress: False

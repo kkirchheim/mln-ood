@@ -1,0 +1,83 @@
+defaults:
+  - override hydra/job_logging: colorlog
+  - override hydra/hydra_logging: colorlog
+
+hydra:
+  job_logging:
+    handlers:
+      file:
+        filename: ${hydra.runtime.output_dir}/${hydra.job.name}.log
+
+n_seeds: 1
+device: "cuda"
+
+backbone: "resnet18"
+
+use_oe: True
+
+fit_score_dist_on: "val"
+fit_score_dist: "genextreme"
+
+# where in the "label" tensor is the "class" label
+target_att_index: 18
+
+paths:
+  root: "/run/media/ki/data/datasets/"
+  models: "/run/media/ki/data/mln-ood/rival10/models/${backbone}/"
+  predictions: "/run/media/ki/data/mln-ood/rival10/predictions/${backbone}/"
+
+constraints:
+- 'ears'
+- 'wings -> not ears'
+- 'metallic -> long_snout'
+- 'metallic -> not horns'
+- 'metallic -> not floppy_ears'
+- 'metallic -> not ears'
+
+
+datasets:
+  - "LSUNCrop"
+  - "LSUNResize"
+  # - "Textures"
+  - "TinyImageNetCrop"
+  - "TinyImageNetResize"
+  - "Places365"
+  - "iNaturalist"
+  - "GaussianNoise"
+  - "UniformNoise"
+
+attributes:
+ - 'long_snout'
+ - 'wings'
+ - 'wheels'
+ - 'text'
+ - 'horns'
+ - 'floppy_ears'
+ - 'ears'
+ - 'colored_eyes'
+ - 'tail'
+ - 'mane'
+ - 'beak'
+ - 'hairy'
+ - 'metallic'
+ - 'rectangular'
+ - 'wet'
+ - 'long'
+ - 'tall'
+ - 'patterned'
+ - 'label'
+ - "oe"
+
+target_att: "label"
+
+
+mln:
+  train_on: "val"
+  epochs: 1
+  batch_size: 40000
+  lr: 1
+  loss: "pseudo"
+  init: 0.0
+#  weight_decay: 0.0
+#  momentum: 0.0
+#  nesterov: False

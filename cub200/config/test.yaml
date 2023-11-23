@@ -1,0 +1,331 @@
+defaults:
+  - override hydra/job_logging: colorlog
+  - override hydra/hydra_logging: colorlog
+
+hydra:
+  job_logging:
+    handlers:
+      file:
+        filename: ${hydra.runtime.output_dir}/${hydra.job.name}.log
+
+n_seeds: 7
+device: "cuda"
+
+backbone: "resnet50"
+
+paths:
+  root: "/run/media/ki/data/datasets/"
+  models: "/run/media/ki/data/mln-ood/cub200/models/${backbone}/"
+  predictions: "/run/media/ki/data/mln-ood/cub200/predictions/${backbone}/"
+
+use_oe: False
+
+fit_score_dist_on: "train"
+
+datasets:
+  - "LSUNCrop"
+  - "LSUNResize"
+  # - "Textures"
+  - "TinyImageNetCrop"
+  - "TinyImageNetResize"
+  - "Places365"
+  - "iNaturalist"
+  - "GaussianNoise"
+  - "UniformNoise"
+
+
+constraints:
+##  mmining, full, 28.03.25
+- ((has_forehead_color_grey=1 or not has_breast_color_grey=1) and (has_wing_pattern_solid=0 and has_wing_pattern_spotted=0))
+- ((not has_upperparts_color_brown=0 -> has_head_pattern_eyebrow=0) -> (has_wing_color_yellow=1 -> has_belly_color_yellow=0))
+- (has_forehead_color_black=0 or not has_upperparts_color_black=0)
+- (has_leg_color_black=0 -> (has_upper_tail_color_buff=1 -> has_forehead_color_white=0))
+- (has_under_tail_color_white=0 and has_throat_color_white=0)
+- (not has_upper_tail_color_black=1 -> (has_upperparts_color_grey=1 or has_wing_pattern_solid=0))
+- (not has_wing_pattern_spotted=1 and (not has_upper_tail_color_black=1 xor has_wing_color_yellow=0))
+
+
+  # ?
+#- ((class=13 or has_nape_color_grey=0) xor (has_nape_color_grey=1 -> has_head_pattern_plain=1))
+#- ((class=138 -> has_upperparts_color_white=1) or (has_under_tail_color_grey=0 or has_upper_tail_color_grey=1))
+#- (not has_upperparts_color_brown=1 and not has_upper_tail_color_black=0)
+#- has_leg_color_black=1
+#- has_under_tail_color_grey=1
+#- has_wing_color_brown=1
+
+
+# 13.03.25
+#  - (has_wing_color_brown=0 or (has_leg_color_black=0 or has_nape_color_grey=0))
+#  - has_under_tail_color_grey=1
+#  - has_upper_tail_color_black=0
+
+  # 03.03.25
+#  - ((has_upper_tail_color_grey=1 xor has_upper_tail_color_grey=1) or (class=171 -> has_nape_color_black=1))
+#  - (class=126 -> has_primary_color_brown=0)
+#  - class=21
+#  - class=27
+#  - class=66
+#  - class=67
+
+# my mining 27.02.25
+#  - ((class=32 or class=177) and (has_nape_color_black=0 -> has_leg_color_black=0))
+#  - class=112
+#  - class=189
+#  - class=27
+#  - class=66
+
+#  ?
+#- 'class=127'
+#- 'class=141'
+#- 'has_upperparts_color_brown'
+#- 'class=21 -> has_upperparts_color_brown'
+#- 'class=27 -> has_upperparts_color_brown'
+#- 'class=66 -> has_primary_color_brown'
+#- 'class=67 -> has_leg_color_black'
+
+
+# python mining.py paths.predictions=predictions/resnet50 min_delta=0.001 n_seeds=5
+#- 'class=0 -> has_head_pattern_plain'
+#- 'class=3 -> has_head_pattern_plain'
+#- 'class=7 -> has_nape_color_black'
+#- 'class=12 -> has_upper_tail_color_grey'
+#- 'class=16 -> has_back_pattern_multi_colored'
+#- 'class=19 -> has_upperparts_color_brown'
+#- 'class=21 -> has_upperparts_color_brown'
+#- 'class=21 -> has_nape_color_black'
+#- 'class=21 -> has_primary_color_brown'
+#- 'class=22 -> has_head_pattern_plain'
+#- 'class=27 -> has_upperparts_color_brown'
+#- 'class=27 -> has_upperparts_color_white'
+#- 'class=27 -> has_nape_color_black'
+#- 'class=29 -> has_leg_color_black'
+#- 'class=32 -> has_upper_tail_color_grey'
+#- 'class=34 -> has_back_pattern_multi_colored'
+#- 'class=41 -> has_upperparts_color_brown'
+#- 'class=43 -> has_head_pattern_plain'
+#- 'class=44 -> has_upperparts_color_white'
+#- 'class=44 -> has_head_pattern_plain'
+#- 'class=48 -> has_back_pattern_multi_colored'
+#- 'class=53 -> has_upperparts_color_brown'
+#- 'class=54 -> has_upperparts_color_brown'
+#- 'class=55 -> has_upperparts_color_white'
+#- 'class=57 -> has_head_pattern_plain'
+#- 'class=62 -> has_head_pattern_plain'
+#- 'class=66 -> has_primary_color_brown'
+#- 'class=67 -> has_primary_color_brown'
+#- 'class=67 -> has_leg_color_black'
+#- 'class=70 -> has_upper_tail_color_grey'
+#- 'class=70 -> has_primary_color_brown'
+#- 'class=70 -> has_leg_color_black'
+#- 'class=75 -> has_primary_color_brown'
+#- 'class=81 -> has_upper_tail_color_grey'
+#- 'class=84 -> has_leg_color_black'
+#- 'class=88 -> has_primary_color_brown'
+#- 'class=91 -> has_upperparts_color_brown'
+#- 'class=91 -> has_nape_color_black'
+#- 'class=103 -> has_leg_color_black'
+#- 'class=105 -> has_nape_color_black'
+#- 'class=107 -> has_leg_color_black'
+#- 'class=112 -> has_upperparts_color_brown'
+#- 'class=112 -> has_primary_color_brown'
+#- 'class=116 -> has_nape_color_black'
+#- 'class=125 -> has_upperparts_color_brown'
+#- 'class=125 -> has_primary_color_brown'
+#- 'class=127 -> has_upperparts_color_brown'
+#- 'class=127 -> has_upper_tail_color_grey'
+#- 'class=127 -> has_primary_color_brown'
+#- 'class=136 -> has_nape_color_black'
+#- 'class=141 -> has_upperparts_color_white'
+#- 'class=143 -> has_nape_color_black'
+#- 'class=144 -> has_leg_color_black'
+#- 'class=149 -> has_leg_color_black'
+#- 'class=158 -> has_nape_color_black'
+#- 'class=158 -> has_leg_color_black'
+#- 'class=160 -> has_upperparts_color_white'
+#- 'class=175 -> has_primary_color_brown'
+#- 'class=177 -> has_upperparts_color_brown'
+#- 'class=186 -> has_upperparts_color_white'
+#- 'class=186 -> has_nape_color_black'
+#- 'class=189 -> has_upperparts_color_brown'
+#- 'class=189 -> has_upperparts_color_white'
+#- 'class=189 -> has_leg_color_black'
+#- 'class=196 -> has_upperparts_color_brown'
+#- 'class=197 -> has_back_pattern_multi_colored'
+
+
+#- 'class=21 -> has_upperparts_color_brown'
+#- 'class=21 -> has_nape_color_black'
+#- 'class=27 -> has_upperparts_color_brown'
+#- 'class=27 -> has_primary_color_brown'
+#- 'class=66 -> has_primary_color_brown'
+#- 'class=67 -> has_primary_color_brown'
+#- 'class=67 -> has_leg_color_black'
+#- 'class=112 -> has_primary_color_brown'
+#- 'class=127 -> has_upperparts_color_brown'
+#- 'class=158 -> has_leg_color_black'
+#- 'class=186 -> has_nape_color_black'
+#- 'class=189 -> has_upperparts_color_white'
+
+
+#- 'class=16 -> has_back_pattern_multi_colored'
+#- 'class=19 -> has_upperparts_color_brown'
+#- 'class=21 -> has_wing_color_brown'
+#- 'class=21 -> has_upperparts_color_brown'
+#- 'class=27 -> has_wing_color_brown'
+#- 'class=27 -> has_upperparts_color_brown'
+#- 'class=32 -> has_wing_color_brown'
+#- 'class=32 -> has_crown_color_grey'
+#- 'class=43 -> has_upper_tail_color_black'
+#- 'class=44 -> has_head_pattern_plain'
+#- 'class=55 -> has_upperparts_color_white'
+#- 'class=66 -> has_wing_color_brown'
+#- 'class=66 -> has_primary_color_brown'
+#- 'class=66 -> has_wing_pattern_solid'
+#- 'class=67 -> has_nape_color_grey'
+#- 'class=67 -> has_primary_color_brown'
+#- 'class=67 -> has_leg_color_black'
+#- 'class=70 -> has_upper_tail_color_black'
+#- 'class=91 -> has_wing_color_white'
+#- 'class=91 -> has_upperparts_color_brown'
+#- 'class=105 -> has_upper_tail_color_black'
+#- 'class=112 -> has_wing_color_brown'
+#- 'class=127 -> has_wing_color_brown'
+#- 'class=127 -> has_wing_pattern_striped'
+#- 'class=141 -> has_upper_tail_color_black'
+#- 'class=158 -> has_upper_tail_color_black'
+#- 'class=177 -> has_wing_color_brown'
+#- 'class=186 -> has_upper_tail_color_black'
+#- 'class=189 -> has_wing_color_white'
+#- 'class=189 -> has_upperparts_color_white'
+#- 'class=189 -> has_upper_tail_color_black'
+
+
+attributes:
+- "class"
+- "has_bill_shape_dagger"
+- "has_bill_shape_hooked_seabird"
+# - "has_bill_shape_all_purpose"
+- "has_bill_shape_cone"
+- "has_wing_color_brown"
+- "has_wing_color_grey"
+- "has_wing_color_yellow"
+- "has_wing_color_black"
+- "has_wing_color_white"
+- "has_wing_color_buff"
+- "has_upperparts_color_brown"
+- "has_upperparts_color_grey"
+- "has_upperparts_color_yellow"
+- "has_upperparts_color_black"
+- "has_upperparts_color_white"
+- "has_upperparts_color_buff"
+- "has_underparts_color_brown"
+- "has_underparts_color_grey"
+- "has_underparts_color_yellow"
+- "has_underparts_color_black"
+- "has_underparts_color_white"
+- "has_underparts_color_buff"
+- "has_breast_pattern_solid"
+- "has_breast_pattern_striped"
+- "has_breast_pattern_multi_colored"
+- "has_back_color_brown"
+- "has_back_color_grey"
+- "has_back_color_yellow"
+- "has_back_color_black"
+- "has_back_color_white"
+- "has_back_color_buff"
+- "has_tail_shape_notched_tail"
+- "has_upper_tail_color_brown"
+- "has_upper_tail_color_grey"
+- "has_upper_tail_color_black"
+- "has_upper_tail_color_white"
+- "has_upper_tail_color_buff"
+- "has_head_pattern_eyebrow"
+- "has_head_pattern_plain"
+- "has_breast_color_brown"
+- "has_breast_color_grey"
+- "has_breast_color_yellow"
+- "has_breast_color_black"
+- "has_breast_color_white"
+- "has_breast_color_buff"
+- "has_throat_color_grey"
+- "has_throat_color_yellow"
+- "has_throat_color_black"
+- "has_throat_color_white"
+- "has_throat_color_buff"
+- "has_eye_color_black"
+- "has_bill_length_about_the_same_as_head"
+- "has_bill_length_shorter_than_head"
+- "has_forehead_color_blue"
+- "has_forehead_color_brown"
+- "has_forehead_color_grey"
+- "has_forehead_color_yellow"
+- "has_forehead_color_black"
+- "has_forehead_color_white"
+- "has_under_tail_color_brown"
+- "has_under_tail_color_grey"
+- "has_under_tail_color_black"
+- "has_under_tail_color_white"
+- "has_under_tail_color_buff"
+- "has_nape_color_brown"
+- "has_nape_color_grey"
+- "has_nape_color_yellow"
+- "has_nape_color_black"
+- "has_nape_color_white"
+- "has_nape_color_buff"
+- "has_belly_color_brown"
+- "has_belly_color_grey"
+- "has_belly_color_yellow"
+- "has_belly_color_black"
+- "has_belly_color_white"
+- "has_belly_color_buff"
+- "has_wing_shape_rounded_wings"
+- "has_wing_shape_pointed_wings"
+- "has_size_small__5___9_in_"
+- "has_size_medium__9___16_in_"
+- "has_size_very_small__3___5_in_"
+- "has_shape_duck_like"
+- "has_shape_perching_like"
+- "has_back_pattern_solid"
+- "has_back_pattern_striped"
+- "has_back_pattern_multi_colored"
+- "has_tail_pattern_solid"
+- "has_tail_pattern_striped"
+- "has_tail_pattern_multi_colored"
+- "has_belly_pattern_solid"
+- "has_primary_color_brown"
+- "has_primary_color_grey"
+- "has_primary_color_yellow"
+- "has_primary_color_black"
+- "has_primary_color_white"
+- "has_primary_color_buff"
+- "has_leg_color_grey"
+- "has_leg_color_black"
+- "has_leg_color_buff"
+- "has_bill_color_grey"
+- "has_bill_color_black"
+- "has_bill_color_buff"
+- "has_crown_color_blue"
+- "has_crown_color_brown"
+- "has_crown_color_grey"
+- "has_crown_color_yellow"
+- "has_crown_color_black"
+- "has_crown_color_white"
+- "has_wing_pattern_solid"
+- "has_wing_pattern_spotted"
+- "has_wing_pattern_striped"
+- "has_wing_pattern_multi_colored"
+
+
+target_att: "class"
+
+mln:
+  train_on: "val"
+  epochs: 1
+  batch_size: 400000
+  lr: 1
+  loss: "pseudo"
+  init: 0
+  progress: False
+#  weight_decay: 0.1
+#  momentum: 0.9
+#  nesterov: False
