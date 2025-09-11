@@ -16,12 +16,20 @@ from evo import (
     get_operators,
     worker_node,
     run_evolutionary_search,
+    RandomSampler,
+    LLMSampler
 )
 from shared import get_output_dir
 from dataset import category_value_map
 
 
 log = logging.getLogger(f"rank-{MPI.COMM_WORLD.Get_rank():03d}")
+
+logging.getLogger("httpcore.http11").setLevel(logging.WARNING)
+logging.getLogger("urllib3.connectionpool").setLevel(logging.WARNING)
+logging.getLogger("httpcore.connection").setLevel(logging.WARNING)
+logging.getLogger("openai._base_client").setLevel(logging.WARNING)
+logging.getLogger("httpx").setLevel(logging.WARNING)
 
 # hotfix
 category_value_map = {
@@ -67,12 +75,18 @@ def main(cfg):
     objective = hydra.utils.instantiate(cfg.objective, domain=domain, compiler=compiler)
     objective.cfg = cfg
 
+    sampler = LLMSampler(
+        propositions=propositions,
+        operators=operators,
+        compiler=compiler,
+    )
+
     if rank == 0:
         if "debug" in cfg and cfg.debug:
             logging.getLogger().setLevel(logging.DEBUG)
             log.setLevel(logging.DEBUG)
 
-        master_node(cfg, propositions, operators, selector=selector)
+        master_node(cfg, propositions, operators, selector=selector, sampler=sampler)
         time.sleep(5)
         log.info(f"Terminating master")
     else:
@@ -85,7 +99,7 @@ def main(cfg):
         )
 
 
-def master_node(cfg, propositions, operators, selector):
+def master_node(cfg, propositions, operators, selector, sampler):
     comm = MPI.COMM_WORLD
     size = comm.Get_size()
 
@@ -105,6 +119,7 @@ def master_node(cfg, propositions, operators, selector):
         propositions=propositions,
         operators=operators,
         selector=selector,
+        sampler=sampler,
         resume_from=resume_from,
     )
 

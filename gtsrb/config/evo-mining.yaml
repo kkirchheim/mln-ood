@@ -63,3 +63,6 @@ mln:
   epochs: 10
   batch_size: 40000
   lr: 0.01
+  init: 0
+  loss: "pseudo"
+  progress: False

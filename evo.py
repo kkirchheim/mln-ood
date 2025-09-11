@@ -7,14 +7,16 @@ from abc import ABC, abstractmethod
 from collections import defaultdict
 from functools import lru_cache
 from os.path import join
-from typing import List, Dict
+from typing import List, Dict, Any, Tuple
 import multiprocessing as mp
 import pickle
 import numpy as np
 import socket
-
+import os
+import json
 import pandas as pd
 import torch
+from openai import OpenAI
 
 from torch import nn
 
@@ -123,6 +125,287 @@ class Selector(ABC):
     @abstractmethod
     def select(self, individuals: List[Individual], metrics) -> List[Individual]:
         pass
+
+class Sampler(ABC):
+    """
+    Sample new constraints
+    """
+
+    @abstractmethod
+    def sample(self, constraints: List[Node]) -> Node:
+        """
+        generates a new constraint based on the list of existing constraints
+        """
+        pass
+
+
+class LLMSampler(Sampler):
+    def __init__(self, propositions, operators, compiler: ConstraintCompiler):
+        self.propositions = propositions
+        self.operators = operators
+        self.compiler = compiler
+        self.client = LLMSampler.make_client("ollama")
+
+    def sample(self, constraints: List[Node]) -> Node:
+
+        log.info(f"Sampling ... {constraints}")
+        # Initialize state
+        state = {
+            "propositions": self.compiler.category_value_map,
+            "operators": ["and", "or", "xor", "->"], #"# [str(o.__name__.lower()) for o in self.operators],
+            "constraints": [{"text": str(c)} for c in constraints],
+            "notes": "",
+            "provider": "ollama",
+            "model": "llama3.1:70b",
+        }
+
+        user_prompt = LLMSampler.build_user_prompt(
+            state["propositions"],
+            state["operators"],
+            state["constraints"]
+        )
+
+        success = False
+        for _ in range(4):
+
+            log.info(f"User prompt: {user_prompt}")
+
+            try:
+                obj = LLMSampler.call_once(
+                    client=self.client,
+                    model="llama3.1:70b",
+                    system_prompt=LLMSampler.SYSTEM_PROMPT,
+                    user_prompt=user_prompt,
+                    temperature=0.4,
+                    seed=random.randint(0, 10000) # 42 + i,  # vary seed slightly per iter
+                )
+            except Exception as e:
+                log.error(f"model error: {e}")
+                continue
+
+            c = obj.get("constraint", {})
+            text = str(c.get("text", "")).strip()
+            log.info(f"Response: {text}")
+
+            try:
+                tokens = self.compiler.tokenize(text)
+                parser = ConstraintCompiler.Parser(tokens, self.compiler.variables, self.operators, self.compiler)
+                parser.parse_expression()
+
+            except Exception as e:
+                continue
+
+            # if not LLMSampler.is_constraint_valid(text, state["propositions"]):
+            #     log.info(f"Constraint {text} is not valid")
+            #     continue
+
+            #state["constraints"].append(
+            #    {"text": text, "rationale": c.get("rationale", ""), "tags": c.get("tags", [])}
+            #)
+            success = True
+            break
+
+        if not success:
+            log.error(f"no valid new constraint produced.")
+            return RandomSampler.generate_random_constraint(
+                propositions=self.propositions,
+                operators=self.operators,
+            )
+            # continue loop; keep going to try to reach total count
+
+
+        log.info(f"Parsing {text}")
+        tokens = self.compiler.tokenize(text)
+        parser = ConstraintCompiler.Parser(tokens, self.compiler.variables, self.operators, self.compiler)
+        ast = parser.parse_expression()
+
+        log.info(f"Parsed expression: {ast}")
+
+        return ast
+
+    SYSTEM_PROMPT = """You generate strict logical constraints that describe NORMAL data for an anomaly detection task in traffic sign perception.
+
+    Hard rules:
+    - Generate EXACTLY ONE new constraint per response.
+    - Use only the given propositions, operators, and allowed values.
+    - Propositions are atomic predicates of the form prop=value with allowed values.
+    - Operators: and, or, xor, ->.
+    - Syntax example: "prop1=value1 -> (prop2=value2 and prop3=value3)",.
+    - Reflect plausible normal co-occurrences. No anomalies, no tautologies, no contradictions.
+    - Do not invent new propositions or values.
+    - Do not repeat any constraint already in the provided existing list.
+
+    Return JSON ONLY with this schema:
+    {
+      "constraint": {
+        "text": "proposition1=value1 -> (proposition2=value2 and proposition3=value3)",
+        "rationale": "why this is normal",
+        "tags": ["high-confidence","semantic"]
+      },
+      "notes": "optional brief global note"
+    }
+    """
+
+    USER_TEMPLATE = """Propositions with allowed values:
+    {props_block}
+
+    Allowed logical operators: {ops_block}
+
+    Existing constraints (DO NOT DUPLICATE):
+    {existing_block}
+
+    Task:
+    Generate EXACTLY ONE NEW constraint that is not in the list above. Keep it concise and discriminative.
+    """
+
+    # ---------- Helpers ----------
+    @staticmethod
+    def make_client(provider: str) -> OpenAI:
+        if provider == "ollama":
+            host = os.getenv("OLLAMA_HOST", "localhost:11434")
+            base_url = os.getenv("OLLAMA_BASE_URL", f"http://{host}/v1")
+            return OpenAI(base_url=base_url, api_key=os.getenv("OLLAMA_API_KEY", "ollama"))
+        elif provider == "openai":
+            return OpenAI()
+        raise ValueError("provider must be 'ollama' or 'openai'")
+
+    @staticmethod
+    def build_props_block(props: Dict[str, List[str]], ops: List[str]) -> Tuple[str, str]:
+        props_lines = [f"{p} = [{', '.join(vals)}]" for p, vals in props.items()]
+        return "\n".join(props_lines), ", ".join(ops)
+
+    # @staticmethod
+    # def is_constraint_valid(text: str, propositions: Dict[str, List[str]]) -> bool:
+    #     if not text or not isinstance(text, str):
+    #         return False
+    #     # Surface-level token checks. Conservative by design.
+    #     atoms_like = [a.strip() for a in text.replace(" -> ", " and ").split(" and ")]
+    #     for atom in atoms_like:
+    #         if any(op in atom for op in [" or ", " xor ", " -> "]):
+    #             continue
+    #         if "=" in atom:
+    #             prop, val = [t.strip() for t in atom.split("=", 1)]
+    #             if prop not in propositions:
+    #                 return False
+    #             val_clean = val.strip("'\"")
+    #             if val_clean not in propositions[prop]:
+    #                 return False
+    #     return True
+
+    @staticmethod
+    def build_user_prompt(
+            props: Dict[str, List[str]],
+            ops: List[str],
+            existing: List[Dict[str, Any]],
+    ) -> str:
+        props_block, ops_block = LLMSampler.build_props_block(props, ops)
+        existing_texts = [c["text"] for c in existing if isinstance(c, dict) and "text" in c]
+        if existing_texts:
+            existing_block = json.dumps(existing_texts, ensure_ascii=False, indent=2)
+        else:
+            existing_block = "[]"
+        return LLMSampler.USER_TEMPLATE.format(
+            props_block=props_block, ops_block=ops_block, existing_block=existing_block
+        )
+
+    @staticmethod
+    def call_once(
+            client: OpenAI,
+            model: str,
+            system_prompt: str,
+            user_prompt: str,
+            temperature: float,
+            seed: int,
+    ) -> Dict[str, Any]:
+        resp = client.chat.completions.create(
+            model=model,
+            temperature=temperature,
+            seed=seed,
+            response_format={"type": "json_object"},
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+        )
+        content = resp.choices[0].message.content
+        log.info(f"content: {content}")
+        try:
+            return json.loads(content)
+        except Exception:
+            # Try to salvage JSON
+            s, e = content.find("{"), content.rfind("}")
+            if s != -1 and e != -1 and e > s:
+                return json.loads(content[s : e + 1])
+            raise RuntimeError(f"Non-JSON response:\n{content}")
+
+class RandomSampler(Sampler):
+    """
+    Randomly Samples new Constraints
+    """
+
+    def __init__(self, propositions, operators, max_depth=2, p_unary=0.2, p_prop=0.3):
+        self.propositions = propositions
+        self.operators = operators
+        self.max_depth = max_depth
+        self.p_unary = p_unary
+        self.p_prop = p_prop
+
+    def sample(self, constraints: List[Node]) -> Node:
+        return self.generate_random_constraint(
+            propositions=self.propositions,
+            operators=self.operators,
+            max_depth=self.max_depth
+        )
+
+    @staticmethod
+    def random_expr(propositions, operators, max_depth=2, p_unary=0.2, p_prop=0.3) -> Node:
+        """
+        Recursively build a random logical expression from the grammar.
+        - If max_despth == 0, pick a proposition or its negation.
+        - Else pick a binary operator and recurse.
+        """
+        # Base case: random proposition or NOT proposition
+        if max_depth == 0 or random.random() < p_prop:
+
+            if isinstance(propositions, dict):
+                # propositions are categorical
+                prop = random.choice(list(propositions.keys()))
+                value = random.choice(propositions[prop])
+                atom = CategoricalVariable(name=prop, value=value)
+
+                if random.random() < p_unary:
+                    return Not(atom)
+                else:
+                    return atom
+
+            # assume propositions are binary
+            prop = random.choice(propositions)
+            # chance to wrap it in NOT (or set p_unary as needed)
+            if random.random() < p_unary:
+                return Not(BinaryVariable(name=prop))
+            else:
+                return BinaryVariable(name=prop)
+        else:
+            # Binary operator
+
+            left = RandomSampler.random_expr(propositions, operators, max_depth - 1, p_unary=p_unary)
+            right = RandomSampler.random_expr(propositions, operators, max_depth - 1, p_unary=p_unary)
+            op = random.choice(operators)(left=left, right=right)
+            return op
+
+    @staticmethod
+    def generate_random_constraint(propositions, operators, max_depth=2) -> Node:
+        """
+        Return a *string* that represents a constraint in your grammar.
+        In practice, you would do something like:
+          expr = random_expr_ast(propositions, max_depth)
+          constraint_str = expr_to_string(expr)
+        Here, we'll return a simple placeholder.
+        """
+        # stochastic depth -> will be stochastic anyway
+        # depth = random.choice(range(0, max_depth))
+
+        return RandomSampler.random_expr(propositions, operators=operators, max_depth=max_depth)
 
 
 class ObjectiveFunctionSelector(Selector):
@@ -525,7 +808,7 @@ class FitnessAUROC(Fitness):
         torch.nn.init.constant_(self.mln.w.data, cfg.mln.init)
         train_data = get_predictions(data_train, self.cfg.attributes)
 
-        if cfg.mnl.loss == "pseudo":
+        if cfg.mln.loss == "pseudo":
             train_mln_pseudo(self.cfg, self.mln, train_data, use_prog=cfg.mln.progress)
         elif cfg.mln.loss == "likelihood":
             train_mln(self.cfg, self.mln, train_data, use_prog=cfg.mln.progress)
@@ -679,54 +962,6 @@ class LogicFitness(FitnessAUROC):
         return fitness
 
 
-def random_expr(propositions, operators, max_depth=2, p_unary=0.2, p_prop=0.3):
-    """
-    Recursively build a random logical expression from the grammar.
-    - If max_depth == 0, pick a proposition or its negation.
-    - Else pick a binary operator and recurse.
-    """
-    # Base case: random proposition or NOT proposition
-    if max_depth == 0 or random.random() < p_prop:
-
-        if isinstance(propositions, dict):
-            # propositions are categorical
-            prop = random.choice(list(propositions.keys()))
-            value = random.choice(propositions[prop])
-            atom = CategoricalVariable(name=prop, value=value)
-
-            if random.random() < p_unary:
-                return Not(atom)
-            else:
-                return atom
-
-        # assume propositions are binary
-        prop = random.choice(propositions)
-        # chance to wrap it in NOT (or set p_unary as needed)
-        if random.random() < p_unary:
-            return Not(BinaryVariable(name=prop))
-        else:
-            return BinaryVariable(name=prop)
-    else:
-        # Binary operator
-
-        left = random_expr(propositions, operators, max_depth - 1, p_unary=p_unary)
-        right = random_expr(propositions, operators, max_depth - 1, p_unary=p_unary)
-        op = random.choice(operators)(left=left, right=right)
-        return op
-
-
-def generate_random_constraint(propositions, operators, max_depth=2) -> Node:
-    """
-    Return a *string* that represents a constraint in your grammar.
-    In practice, you would do something like:
-      expr = random_expr_ast(propositions, max_depth)
-      constraint_str = expr_to_string(expr)
-    Here, we'll return a simple placeholder.
-    """
-    # stochastic depth -> will be stochastic anyway
-    # depth = random.choice(range(0, max_depth))
-
-    return random_expr(propositions, operators=operators, max_depth=max_depth)
 
 
 class TreeMutation(MutationOperator):
@@ -788,7 +1023,7 @@ class TreeMutation(MutationOperator):
                     log.warning(f"Missing child in {current}")
                     return
 
-                prop = random_expr(self.propositions, operators=[], max_depth=0)
+                prop = RandomSampler.random_expr(self.propositions, operators=[], max_depth=0)
                 # current._children.remove(to_drop)
                 current.left = prop
                 # current._children.append(prop)
@@ -799,7 +1034,7 @@ class TreeMutation(MutationOperator):
                     log.warning(f"Missing child in {current}")
                     return
 
-                prop = random_expr(self.propositions, operators=[], max_depth=0)
+                prop = RandomSampler.random_expr(self.propositions, operators=[], max_depth=0)
                 # current._children.remove(to_drop)
                 current.right = prop
                 # current._children.append(prop)
@@ -843,7 +1078,7 @@ class TreeMutation(MutationOperator):
                 return new_ind
 
             elif choice == "add":
-                new_constraint = generate_random_constraint(
+                new_constraint = RandomSampler.generate_random_constraint(
                     self.propositions, self.operators, max_depth=self.max_depth
                 )
                 if not new_ind.has_constraint(new_constraint):
@@ -858,7 +1093,7 @@ class TreeMutation(MutationOperator):
 
     def replace_constraint(self, new_ind):
         idx = random.randrange(len(new_ind))
-        new_constraint = generate_random_constraint(
+        new_constraint = RandomSampler.generate_random_constraint(
             self.propositions, self.operators, max_depth=self.max_depth
         )
         del new_ind.constraints[idx]
@@ -1048,7 +1283,7 @@ def mpi_create_new_population(cfg, survivors, population_size):
 
 
 def run_evolutionary_search(
-    cfg, propositions: List[str], operators, selector, resume_from=None
+    cfg, propositions: List[str], operators, selector, sampler, resume_from=None
 ):
     """
     Simple evolutionary search with parallel fitness evaluation and caching.
@@ -1076,6 +1311,7 @@ def run_evolutionary_search(
             cfg.population_size,
             propositions,
             operators,
+            sampler
         )
 
         best_individual = None
@@ -1167,17 +1403,16 @@ def init_population(
     population_size,
     propositions,
     operators,
+    sampler
 ):
     population: List[Individual] = []
     log.info(f"Creating population")
     for n in range(population_size):
-        # log.info(f"Creating {n}")
+        log.info(f"Creating {n}")
         constraints = []
         for j in range(init_constraints_per_individual):
-            c = generate_random_constraint(
-                propositions, operators, max_depth=cfg.max_depth
-            )
-            # log.info(f"Generation {n}: {c}")
+            c = sampler.sample(constraints=constraints)
+            log.debug(f"Sampled Constraint: {c}")
             constraints.append(c)
 
         # log.info(f"Pop {n}/{population_size}")

@@ -43,7 +43,6 @@ class Operator(Node):
             return True
         return False
 
-
 class Atom(Node):
     pass
 
@@ -541,7 +540,6 @@ if __name__ == "__main__":
 
     print(ast)
     print(type(ast))
-
-    print(And() in ast)
-
-    print(Xor() in ast)
+    # print(And() in ast)
+    #
+    # print(Xor() in ast)
