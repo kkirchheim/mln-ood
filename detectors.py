@@ -159,7 +159,7 @@ class ViMDetector(Detector):
         self.target_att_index = target_att_index
 
     def fit(self, cfg, fitting_data):
-        log.info(f"Fitting {self.name}")
+        log.debug(f"Fitting {self.name}")
         self.detector.fit_features(
             fitting_data[f"{self.attribute}-features"],
             fitting_data["labels"][:, self.target_att_index],
@@ -181,7 +181,7 @@ class DICEDetector(Detector):
         self.target_att_index = target_att_index
 
     def fit(self, cfg, data):
-        log.info(f"Fitting {self.name}")
+        log.debug(f"Fitting {self.name}")
         self.detector.fit_features(
             data[f"{self.attribute}-features"],
             data["labels"][:, self.target_att_index],
@@ -348,7 +348,7 @@ class MLNCombinedDetector(Detector):
             self.params = self.dist.fit(scores_val.cpu())
             try:
                 res = cramervonmises(scores_val.cpu(), self.dist_name, self.params)
-                log.info(
+                log.debug(
                     f"Fitting {str(self.__class__).split('.')[-1][:-2]} p={res.pvalue:.5f}"
                 )
             except Exception as e:
@@ -478,7 +478,7 @@ class MLNViMDetector(MLNCombinedDetector):
         self.attribute = attribute
 
     def fit(self, cfg, fitting_data):
-        log.info(f"Fitting {self.name}")
+        log.debug(f"Fitting {self.name}")
 
         scores_val = batch_predict_features(
             self.vim_detector.detector,
@@ -511,7 +511,7 @@ class MLNDICEDetector(MLNCombinedDetector):
         self.attribute = attribute
 
     def fit(self, cfg, fitting_data):
-        log.info(f"Fitting {self.name}")
+        log.debug(f"Fitting {self.name}")
 
         scores_val = batch_predict_features(
             self.dice_detector.detector,
@@ -547,7 +547,7 @@ class MLNSHEDetector(MLNCombinedDetector):
         self.attribute = attribute
 
     def fit(self, cfg, fitting_data):
-        log.info(f"Fitting {self.name}")
+        log.debug(f"Fitting {self.name}")
 
         scores_val = batch_predict_features(
             self.she_detector.detector,
@@ -583,7 +583,7 @@ class MLNReActDetector(MLNCombinedDetector):
         self.attribute = attribute
 
     def fit(self, cfg, fitting_data):
-        log.info(f"Fitting {self.name}")
+        log.debug(f"Fitting {self.name}")
 
         scores_val = batch_predict_features(
             self.react_detector.detector,

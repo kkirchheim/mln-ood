@@ -16,6 +16,7 @@ import os
 import json
 import pandas as pd
 import torch
+from omegaconf import DictConfig
 from openai import OpenAI
 
 from torch import nn
@@ -140,23 +141,27 @@ class Sampler(ABC):
 
 
 class LLMSampler(Sampler):
-    def __init__(self, propositions, operators, compiler: ConstraintCompiler):
+    def __init__(self,
+                 propositions,
+                 operators, compiler: ConstraintCompiler,
+                 model = "llama3.1:70b",
+                 temperature = 0.4,
+                 **kwargs):
         self.propositions = propositions
         self.operators = operators
         self.compiler = compiler
         self.client = LLMSampler.make_client("ollama")
+        self.model = model
+        self.temperature = temperature
 
     def sample(self, constraints: List[Node]) -> Node:
-
-        log.info(f"Sampling ... {constraints}")
-        # Initialize state
         state = {
             "propositions": self.compiler.category_value_map,
-            "operators": ["and", "or", "xor", "->"], #"# [str(o.__name__.lower()) for o in self.operators],
+            "operators": ["and", "or", "xor", "->"],
             "constraints": [{"text": str(c)} for c in constraints],
             "notes": "",
             "provider": "ollama",
-            "model": "llama3.1:70b",
+            "model": self.model
         }
 
         user_prompt = LLMSampler.build_user_prompt(
@@ -167,25 +172,21 @@ class LLMSampler(Sampler):
 
         success = False
         for _ in range(4):
-
-            log.info(f"User prompt: {user_prompt}")
-
             try:
                 obj = LLMSampler.call_once(
                     client=self.client,
-                    model="llama3.1:70b",
+                    model=self.model,
                     system_prompt=LLMSampler.SYSTEM_PROMPT,
                     user_prompt=user_prompt,
-                    temperature=0.4,
+                    temperature=self.temperature,
                     seed=random.randint(0, 10000) # 42 + i,  # vary seed slightly per iter
                 )
             except Exception as e:
-                log.error(f"model error: {e}")
+                log.error(f"LLM Sampler error: {e}")
                 continue
 
             c = obj.get("constraint", {})
             text = str(c.get("text", "")).strip()
-            log.info(f"Response: {text}")
 
             try:
                 tokens = self.compiler.tokenize(text)
@@ -195,32 +196,19 @@ class LLMSampler(Sampler):
             except Exception as e:
                 continue
 
-            # if not LLMSampler.is_constraint_valid(text, state["propositions"]):
-            #     log.info(f"Constraint {text} is not valid")
-            #     continue
-
-            #state["constraints"].append(
-            #    {"text": text, "rationale": c.get("rationale", ""), "tags": c.get("tags", [])}
-            #)
             success = True
             break
 
         if not success:
-            log.error(f"no valid new constraint produced.")
+            log.error(f"No valid new constraint produced. Using Random Sampler.")
             return RandomSampler.generate_random_constraint(
                 propositions=self.propositions,
                 operators=self.operators,
             )
-            # continue loop; keep going to try to reach total count
 
-
-        log.info(f"Parsing {text}")
         tokens = self.compiler.tokenize(text)
         parser = ConstraintCompiler.Parser(tokens, self.compiler.variables, self.operators, self.compiler)
         ast = parser.parse_expression()
-
-        log.info(f"Parsed expression: {ast}")
-
         return ast
 
     SYSTEM_PROMPT = """You generate strict logical constraints that describe NORMAL data for an anomaly detection task in traffic sign perception.
@@ -274,24 +262,6 @@ class LLMSampler(Sampler):
         props_lines = [f"{p} = [{', '.join(vals)}]" for p, vals in props.items()]
         return "\n".join(props_lines), ", ".join(ops)
 
-    # @staticmethod
-    # def is_constraint_valid(text: str, propositions: Dict[str, List[str]]) -> bool:
-    #     if not text or not isinstance(text, str):
-    #         return False
-    #     # Surface-level token checks. Conservative by design.
-    #     atoms_like = [a.strip() for a in text.replace(" -> ", " and ").split(" and ")]
-    #     for atom in atoms_like:
-    #         if any(op in atom for op in [" or ", " xor ", " -> "]):
-    #             continue
-    #         if "=" in atom:
-    #             prop, val = [t.strip() for t in atom.split("=", 1)]
-    #             if prop not in propositions:
-    #                 return False
-    #             val_clean = val.strip("'\"")
-    #             if val_clean not in propositions[prop]:
-    #                 return False
-    #     return True
-
     @staticmethod
     def build_user_prompt(
             props: Dict[str, List[str]],
@@ -328,7 +298,7 @@ class LLMSampler(Sampler):
             ],
         )
         content = resp.choices[0].message.content
-        log.info(f"content: {content}")
+        log.debug(f"content: {content}")
         try:
             return json.loads(content)
         except Exception:
@@ -343,7 +313,7 @@ class RandomSampler(Sampler):
     Randomly Samples new Constraints
     """
 
-    def __init__(self, propositions, operators, max_depth=2, p_unary=0.2, p_prop=0.3):
+    def __init__(self, propositions, operators, max_depth=2, p_unary=0.2, p_prop=0.3, **kwargs):
         self.propositions = propositions
         self.operators = operators
         self.max_depth = max_depth
@@ -361,25 +331,27 @@ class RandomSampler(Sampler):
     def random_expr(propositions, operators, max_depth=2, p_unary=0.2, p_prop=0.3) -> Node:
         """
         Recursively build a random logical expression from the grammar.
-        - If max_despth == 0, pick a proposition or its negation.
+        - If max_depth == 0, pick a proposition or its negation.
         - Else pick a binary operator and recurse.
         """
+        # log.info(f"props: {type(propositions)}")
         # Base case: random proposition or NOT proposition
         if max_depth == 0 or random.random() < p_prop:
 
-            if isinstance(propositions, dict):
+            if isinstance(propositions, (dict, DictConfig)):
                 # propositions are categorical
                 prop = random.choice(list(propositions.keys()))
                 value = random.choice(propositions[prop])
-                atom = CategoricalVariable(name=prop, value=value)
+                atom = CategoricalVariable(name=prop, value_str=value)
 
                 if random.random() < p_unary:
                     return Not(atom)
                 else:
                     return atom
+            else:
+                # assume propositions are binary
+                prop = random.choice(propositions)
 
-            # assume propositions are binary
-            prop = random.choice(propositions)
             # chance to wrap it in NOT (or set p_unary as needed)
             if random.random() < p_unary:
                 return Not(BinaryVariable(name=prop))
@@ -972,11 +944,12 @@ class TreeMutation(MutationOperator):
     # TODO: implement: remove subtree
     """
 
-    def __init__(self, propositions, operators, max_depth=2, mutation_rate=0.3):
+    def __init__(self, propositions, operators, sampler, max_depth=2, mutation_rate=0.3):
         self.propositions = propositions
         self.max_depth = max_depth
         self.mutation_rate = mutation_rate
         self.operators = operators
+        self.sampler = sampler
 
     def _find_and_replace_op(
         self, current: Node, old_op: BinaryOperator, new_op: BinaryOperator
@@ -1057,9 +1030,12 @@ class TreeMutation(MutationOperator):
         return node
 
     def mutate(self, individual: Individual) -> Individual:
+        """
+        Mutate an individual
+        """
         new_ind = individual.copy()
         if random.random() < self.mutation_rate:
-            options = ["add", "replace", "mutate-op", "drop-op"]
+            options = ["add", "replace", "remove", "mutate-op", "drop-op"]
 
             if len(individual.constraints) > 1:
                 options.append("remove")
@@ -1078,9 +1054,10 @@ class TreeMutation(MutationOperator):
                 return new_ind
 
             elif choice == "add":
-                new_constraint = RandomSampler.generate_random_constraint(
-                    self.propositions, self.operators, max_depth=self.max_depth
-                )
+                new_constraint = self.sampler.sample(individual.constraints)
+                # new_constraint = RandomSampler.generate_random_constraint(
+                #     self.propositions, self.operators, max_depth=self.max_depth
+                # )
                 if not new_ind.has_constraint(new_constraint):
                     new_ind.add_constraint(new_constraint)
 
@@ -1093,9 +1070,11 @@ class TreeMutation(MutationOperator):
 
     def replace_constraint(self, new_ind):
         idx = random.randrange(len(new_ind))
-        new_constraint = RandomSampler.generate_random_constraint(
-            self.propositions, self.operators, max_depth=self.max_depth
-        )
+        new_constraint = self.sampler.sample(new_ind.constraints)
+
+        #new_constraint = RandomSampler.generate_random_constraint(
+        #    self.propositions, self.operators, max_depth=self.max_depth
+        #)
         del new_ind.constraints[idx]
         if not new_ind.has_constraint(new_constraint):
             new_ind.add_constraint(new_constraint)
@@ -1300,10 +1279,18 @@ def run_evolutionary_search(
         if "fitness_cache" in checkpoint:
             fitness_cache = checkpoint["fitness_cache"]
 
-        best_individual = checkpoint["best_individual"]
-        best_fitness = checkpoint["best_fitness"]
+        if "fitness_cache" in checkpoint:
+            best_individual = checkpoint["best_individual"]
+        else:
+            best_individual = None
+
+        if "best_fitness" in checkpoint:
+            best_fitness = checkpoint["best_fitness"]
+        else:
+            best_fitness = None
+
         population = checkpoint["population"]
-        generation = checkpoint["generation"] + 1
+        generation = 0 if checkpoint["generation"] is None else checkpoint["generation"] + 1
     else:
         population = init_population(
             cfg,
@@ -1313,6 +1300,19 @@ def run_evolutionary_search(
             operators,
             sampler
         )
+
+        # Save state
+        with Timer("Saving state after sampling initial"):
+            path = join(get_output_dir(), f"state-initial-population.pkl")
+            log.info(f"Saving state to {path}")
+
+            pickle.dump(
+                {
+                    "population": population,
+                    "generation": None,
+                },
+                open(path, "wb"),
+            )
 
         best_individual = None
         best_fitness = -math.inf
@@ -1362,7 +1362,7 @@ def run_evolutionary_search(
         # 4) Generate new offspring via crossover + mutation
         with Timer("Sampling new population"):
             log.info(
-                f"Sampling new population: {cfg.population_size} with {mp.cpu_count()}"
+                f"Sampling new population: {cfg.population_size} with {mp.cpu_count()} cpus"
             )
             new_population = mpi_create_new_population(
                 cfg, survivors, cfg.population_size
@@ -1408,7 +1408,7 @@ def init_population(
     population: List[Individual] = []
     log.info(f"Creating population")
     for n in range(population_size):
-        log.info(f"Creating {n}")
+        log.info(f"Creating individual {n} with {init_constraints_per_individual} constraints...")
         constraints = []
         for j in range(init_constraints_per_individual):
             c = sampler.sample(constraints=constraints)

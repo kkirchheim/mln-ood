@@ -1,0 +1,4 @@
+_target_: evo.LLMSampler
+model: "llama3.1:70b"
+temperature: 0.4
+

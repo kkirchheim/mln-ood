@@ -59,11 +59,19 @@ def main(cfg):
     propositions = {k: list(v.keys()) for k, v in category_value_map.items()}
     operators = get_operators(cfg.operators)
 
+    sampler = hydra.utils.instantiate(
+        cfg.sampler,
+        propositions=propositions,
+        operators=operators,
+        compiler=compiler
+    )
+
     mutation_op = TreeMutation(
         propositions=propositions,
         operators=operators,
         max_depth=cfg.max_depth,
         mutation_rate=cfg.mutation_rate,
+        sampler=sampler
     )
 
     selector = hydra.utils.instantiate(cfg.selector)
@@ -74,12 +82,6 @@ def main(cfg):
 
     objective = hydra.utils.instantiate(cfg.objective, domain=domain, compiler=compiler)
     objective.cfg = cfg
-
-    sampler = LLMSampler(
-        propositions=propositions,
-        operators=operators,
-        compiler=compiler,
-    )
 
     if rank == 0:
         if "debug" in cfg and cfg.debug:

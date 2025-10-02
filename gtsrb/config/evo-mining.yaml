@@ -1,5 +1,6 @@
 defaults:
   - selector: pareto
+  - sampler: llm
   - override hydra/job_logging: colorlog
   - override hydra/hydra_logging: colorlog
   - _self_
@@ -27,7 +28,7 @@ population_size: 10000
 mutation_rate: 0.5
 
 # selection
-survival_rate: 0.1
+# survival_rate: 0.1
 
 objective:
   _target_: evo.FitnessAUROC
@@ -50,19 +51,19 @@ paths:
   predictions: "gtsrb/predictions/${backbone}/"
 
 dataset: "Textures"
-validate_on: "val"
+validate_on: "test"
 
 attributes:
-# do not change the ordering
+# do not change the order
   - label
   - color
   - shape
 
 mln:
-  train_on: "train"
-  epochs: 10
+  train_on: "val"
+  epochs: 1
   batch_size: 40000
-  lr: 0.01
+  lr: 0.1
   init: 0
   loss: "pseudo"
   progress: False
